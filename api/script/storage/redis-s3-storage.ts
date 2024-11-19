@@ -14,7 +14,8 @@ import Promise = q.Promise;
 import { isPrototypePollutionKey } from "./storage";
 import path = require("path");
 import Redis from "ioredis";
-import { DeleteObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { DeleteObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { Upload } from "@aws-sdk/lib-storage";
 
 function merge(original: any, updates: any): void {
   for (const property in updates) {
@@ -539,15 +540,23 @@ export class RedisS3Storage implements storage.Storage {
       Body: stream,
     };
 
+
     return q
-      .Promise<string>((resolve, reject) => {
-        this.s3Client
-          .send(new PutObjectCommand(params))
-          .then(() => {
-            resolve(blobId);
-          })
-          .catch(reject);
-      })
+        .Promise<string>((resolve, reject) => {
+          const upload = new Upload({
+            client: this.s3Client,
+            params, // S3 parameters (Bucket, Key, Body, etc.)
+          });
+          upload.on("httpUploadProgress", (progress) => {
+            console.log(`Uploaded: ${progress.loaded} bytes`);
+          });
+          upload
+              .done()
+              .then(() => {
+                resolve(blobId);
+              })
+              .catch(reject);
+        })
       .then(() => {
         this.blobs[blobId] = `https://${process.env.AWS_BUCKET_NAME}.s3.amazonaws.com/${blobId}`;
 
@@ -574,21 +583,18 @@ export class RedisS3Storage implements storage.Storage {
       Key: blobId,
     };
 
-    return q
-      .Promise<void>((resolve, reject) => {
-        this.s3Client
+    return q.Promise<void>((resolve, reject) => {
+      this.s3Client
           .send(new DeleteObjectCommand(params))
           .then(() => {
+            // Remove blob from local state
+            delete this.blobs[blobId];
+            // Save state asynchronously
+            this.saveStateAsync();
             resolve();
           })
           .catch(reject);
-      })
-      .then(() => {
-        delete this.blobs[blobId];
-        this.saveStateAsync();
-
-        return q(<void>null);
-      });
+    });
   }
 
   public addAccessKey(accountId: string, accessKey: storage.AccessKey): Promise<string> {
