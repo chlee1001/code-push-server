@@ -102,12 +102,15 @@ export class RedisManager {
       const redisConfig = {
         host: process.env.REDIS_HOST,
         port: process.env.REDIS_PORT,
-        auth_pass: process.env.REDIS_KEY,
-        tls: {
-          // Note: Node defaults CA's to those trusted by Mozilla
-          rejectUnauthorized: true,
-        },
       };
+      if (process.env.REDIS_KEY) {
+        redisConfig["auth_pass"] = process.env.REDIS_KEY;
+      }
+      if (!process.env.REDIS_TLS_DISABLED) {
+        redisConfig["tls"] = {
+          rejectUnauthorized: true,
+        };
+      }
       this._opsClient = redis.createClient(redisConfig);
       this._metricsClient = redis.createClient(redisConfig);
       this._opsClient.on("error", (err: Error) => {

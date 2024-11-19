@@ -58,8 +58,10 @@ export function start(done: (err?: any, server?: express.Express, storage?: Stor
           return {} as Response;
         };
 
+
         res.send = (body: any) => {
           if (res.headersSent) {
+            console.log("Attempted to send response multiple times. Ignoring.");
             return res;
           }
 
@@ -85,7 +87,7 @@ export function start(done: (err?: any, server?: express.Express, storage?: Stor
 
       // body-parser must be before the Application Insights router.
       app.use(bodyParser.urlencoded({ extended: true }));
-      const jsonOptions: any = { limit: "10kb", strict: true };
+      const jsonOptions: any = { limit: "1mb", strict: true };
       if (process.env.LOG_INVALID_JSON_REQUESTS === "true") {
         jsonOptions.verify = (req: express.Request, res: express.Response, buf: Buffer, encoding: string) => {
           if (buf && buf.length) {
@@ -110,7 +112,7 @@ export function start(done: (err?: any, server?: express.Express, storage?: Stor
       app.set("views", __dirname + "/views");
       app.set("view engine", "ejs");
       app.use("/auth/images/", express.static(__dirname + "/views/images"));
-      app.use(api.headers({ origin: process.env.CORS_ORIGIN || "http://localhost:4000" }));
+      app.use(api.headers({ origin: process.env.CORS_ORIGIN || "http://localhost:3000" }));
       app.use(api.health({ storage: storage, redisManager: redisManager }));
 
       if (process.env.DISABLE_ACQUISITION !== "true") {
